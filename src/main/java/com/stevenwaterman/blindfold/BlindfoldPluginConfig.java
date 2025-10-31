@@ -90,8 +90,8 @@ public interface BlindfoldPluginConfig extends Config
 
 	@ConfigItem(
 		keyName = "disableRendering",
-		name = "Pause when unfocused",
-		description = "Stops the screen from rendering when client is unfocused.<br>Rendering resumes when a notification is received.",
+		name = "Pause when unfocused (broken)",
+		description = "Stops the screen from rendering when client is unfocused.<br>Rendering resumes when a notification is received.<br>Currently non-functional",
 		position = 6
 	)
 	default boolean disableRendering()

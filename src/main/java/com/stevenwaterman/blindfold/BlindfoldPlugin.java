@@ -32,6 +32,7 @@ import lombok.extern.slf4j.Slf4j;
 import net.runelite.api.Actor;
 import net.runelite.api.Client;
 import net.runelite.api.DynamicObject;
+import net.runelite.api.GameObject;
 import net.runelite.api.GameState;
 import net.runelite.api.GraphicsObject;
 import net.runelite.api.IntProjection;
@@ -93,7 +94,7 @@ public class BlindfoldPlugin extends Plugin
 
 	private final RenderCallback DISABLE_RENDERING = new RenderCallback(){
 		@Override
-		public boolean drawEntity(Renderable renderable, boolean ui)
+		public boolean addEntity(Renderable renderable, boolean ui)
 		{
 			return false;
 		}
@@ -114,28 +115,6 @@ public class BlindfoldPlugin extends Plugin
 	private final RenderCallback rcb = new RenderCallback()
 	{
 		@Override
-		public boolean drawEntity(Renderable renderable, boolean ui)
-		{
-			boolean isRuneLiteObject = renderable instanceof RuneLiteObject;
-			boolean render =
-				renderable == client.getLocalPlayer() ||
-				config.enableScenery() && (
-					renderable instanceof Model ||
-					renderable instanceof ModelData ||
-					(!isRuneLiteObject && renderable instanceof GraphicsObject) ||
-					renderable instanceof DynamicObject
-				) ||
-				config.enableEntities() && (
-					renderable instanceof Projectile ||
-					renderable instanceof TileItem ||
-					renderable instanceof Actor
-				) ||
-				isRuneLiteObject && config.enableRuneLiteObjects();
-			// if (!render) check clickbox
-			return render;
-		}
-
-		@Override
 		public boolean drawTile(Scene scene, Tile tile)
 		{
 			return config.enableTerrain();
@@ -144,8 +123,39 @@ public class BlindfoldPlugin extends Plugin
 		@Override
 		public boolean drawObject(Scene scene, TileObject object)
 		{
-//			if (!render) check clickbox
-			return config.enableScenery();
+			try
+			{
+				Renderable renderable = ((GameObject) object).getRenderable();
+
+				if (renderable == client.getLocalPlayer())
+				{
+					return true;
+				}
+
+				if (renderable instanceof Projectile ||
+					renderable instanceof TileItem ||
+					renderable instanceof Actor)
+				{
+					return config.enableEntities();
+				}
+
+				if (renderable instanceof RuneLiteObject)
+				{
+					return config.enableRuneLiteObjects();
+				}
+
+				if (renderable instanceof Model ||
+					renderable instanceof ModelData ||
+					renderable instanceof DynamicObject ||
+					renderable instanceof GraphicsObject)
+				{
+					return config.enableScenery();
+				}
+				return true;
+			}
+			catch (ClassCastException e){
+				return config.enableScenery();
+			}
 		}
 	};
 
@@ -186,15 +196,14 @@ public class BlindfoldPlugin extends Plugin
 //	@Subscribe
 //	public void onFocusChanged(FocusChanged event)
 //	{
-//		if (client.getGameState() == GameState.LOGGED_IN && config.disableRendering() && !event.isFocused()){
+//		if (!event.isFocused() && config.disableRendering() && client.getGameState() == GameState.LOGGED_IN){
 //			clientThread.invoke(() ->
 //				{
 //					renderCallbackManager.unregister(rcb);
 //					renderCallbackManager.register(DISABLE_RENDERING);
-//					client.setGameState(GameState.LOADING);
 //				}
 //			);
-//			log.debug("Focus changed: rendering disabled");
+//			log.debug("Focus lost: rendering disabled");
 //		}
 //		else
 //		{
@@ -205,47 +214,50 @@ public class BlindfoldPlugin extends Plugin
 //					client.setGameState(GameState.LOADING);
 //				}
 //			);
-//			log.debug("Focus changed: rendering reenabled");
+//			log.debug("Focus gained: rendering reenabled");
 //		}
 //	}
 
-	@Subscribe
-	public void onNotificationFired(NotificationFired event){
-		clientThread.invoke(() ->
-			{
-				renderCallbackManager.register(rcb);
-//				renderCallbackManager.unregister(DISABLE_RENDERING);
-				client.setGameState(GameState.LOADING);
-			}
-		);
-		log.debug("notification sent: rendering reenabled");
-	}
+//	@Subscribe
+//	public void onNotificationFired(NotificationFired event){
+//		if (config.disableRendering())
+//		{
+//			clientThread.invoke(() ->
+//				{
+//					renderCallbackManager.register(rcb);
+//					renderCallbackManager.unregister(DISABLE_RENDERING);
+//					client.setGameState(GameState.LOADING);
+//				}
+//			);
+//			log.debug("notification sent: rendering reenabled");
+//		}
+//	}
 
 	@Subscribe
 	public void onConfigChanged(ConfigChanged event){
 		if (!Objects.equals(event.getGroup(), BlindfoldPluginConfig.GROUP)){
 			return;
 		}
-		if (Objects.equals(event.getKey(), "disableRendering")){
-			if (Objects.equals(event.getNewValue(), "false")){
-				clientThread.invoke(() ->
-					{
-						renderCallbackManager.register(rcb);
+//		if (Objects.equals(event.getKey(), "disableRendering")){
+//			if (Objects.equals(event.getNewValue(), "false")){
+//				clientThread.invoke(() ->
+//					{
+//						renderCallbackManager.register(rcb);
 //						renderCallbackManager.unregister(DISABLE_RENDERING);
-						client.setGameState(GameState.LOADING);
-					}
-				);
-			}
-			else {
-				clientThread.invoke(() ->
-					{
-						renderCallbackManager.unregister(rcb);
+//						client.setGameState(GameState.LOADING);
+//					}
+//				);
+//			}
+//			else {
+//				clientThread.invoke(() ->
+//					{
+//						renderCallbackManager.unregister(rcb);
 //						renderCallbackManager.register(DISABLE_RENDERING);
-						client.setGameState(GameState.LOADING);
-					}
-				);
-			}
-		}
+//						client.setGameState(GameState.LOADING);
+//					}
+//				);
+//			}
+//		}
 
 		if (Objects.equals(event.getKey(), "enableTerrain") || Objects.equals(event.getKey(), "enableScenery"))
 		{
@@ -254,74 +266,5 @@ public class BlindfoldPlugin extends Plugin
 					client.setGameState(GameState.LOADING);
 			});
 		}
-	}
-
-	// Check the clickbox even if not drawn
-	public void checkClickbox(Projection projection, Scene scene, Renderable renderable, int orientation, int x, int y, int z, long hash)
-	{
-		Model model = renderable instanceof Model ? (Model) renderable : renderable.getModel();
-		if (model == null)
-			return;
-
-		// Apply height to renderable from the model
-		if (model != renderable)
-			renderable.setModelHeight(model.getModelHeight());
-
-		model.calculateBoundsCylinder();
-
-		if (projection instanceof IntProjection)
-		{
-			IntProjection p = (IntProjection) projection;
-			if (!isVisible(model, p.getPitchSin(), p.getPitchCos(), p.getYawSin(), p.getYawCos(), x - p.getCameraX(), y - p.getCameraY(), z - p.getCameraZ()))
-			{
-				return;
-			}
-		}
-
-		client.checkClickbox(projection, model, orientation, x, y, z, hash);
-	}
-
-	/**
-	 * Check is a model is visible and should be drawn.
-	 */
-	private boolean isVisible(Model model, float pitchSin, float pitchCos, float yawSin, float yawCos, int x, int y, int z)
-	{
-		final int xzMag = model.getXYZMag();
-		final int bottomY = model.getBottomY();
-		final int zoom = client.get3dZoom();
-		final int modelHeight = model.getModelHeight();
-
-		int Rasterizer3D_clipMidX2 = client.getRasterizer3D_clipMidX2(); // width / 2
-		int Rasterizer3D_clipNegativeMidX = client.getRasterizer3D_clipNegativeMidX(); // -width / 2
-		int Rasterizer3D_clipNegativeMidY = client.getRasterizer3D_clipNegativeMidY(); // -height / 2
-		int Rasterizer3D_clipMidY2 = client.getRasterizer3D_clipMidY2(); // height / 2
-
-		float var11 = yawCos * z - yawSin * x;
-		float var12 = pitchSin * y + pitchCos * var11;
-		float var13 = pitchCos * xzMag;
-		float depth = var12 + var13;
-		if (depth > 50)
-		{
-			float rx = z * yawSin + yawCos * x;
-			float var16 = (rx - xzMag) * zoom;
-			if (var16 / depth < Rasterizer3D_clipMidX2)
-			{
-				float var17 = (rx + xzMag) * zoom;
-				if (var17 / depth > Rasterizer3D_clipNegativeMidX)
-				{
-					float ry = pitchCos * y - var11 * pitchSin;
-					float yheight = pitchSin * xzMag;
-					float ybottom = pitchCos * bottomY + yheight; // use bottom height instead of y pos for height
-					float var20 = (ry + ybottom) * zoom;
-					if (var20 / depth > Rasterizer3D_clipNegativeMidY)
-					{
-						float ytop = pitchCos * modelHeight + yheight;
-						float var22 = (ry - ytop) * zoom;
-						return var22 / depth < Rasterizer3D_clipMidY2;
-					}
-				}
-			}
-		}
-		return false;
 	}
 }
