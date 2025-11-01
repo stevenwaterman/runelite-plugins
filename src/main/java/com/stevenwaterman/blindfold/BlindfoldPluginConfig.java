@@ -79,8 +79,8 @@ public interface BlindfoldPluginConfig extends Config
 
 	@ConfigItem(
 			keyName = "enableRuneLiteObjects",
-			name = "Show RuneLite Objects",
-			description = "Disable this to hide objects spawned in by RuneLite plugins.",
+			name = "Show RuneLite Objects (broken)",
+			description = "Disable this to hide objects spawned in by RuneLite plugins.<br>Currently non-functional",
 			position = 5
 	)
 	default boolean enableRuneLiteObjects()

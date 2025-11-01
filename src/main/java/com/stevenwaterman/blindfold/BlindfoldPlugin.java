@@ -123,7 +123,7 @@ public class BlindfoldPlugin extends Plugin
 		@Override
 		public boolean drawObject(Scene scene, TileObject object)
 		{
-			try
+			if (object instanceof GameObject)
 			{
 				Renderable renderable = ((GameObject) object).getRenderable();
 
@@ -153,7 +153,7 @@ public class BlindfoldPlugin extends Plugin
 				}
 				return true;
 			}
-			catch (ClassCastException e){
+			else {
 				return config.enableScenery();
 			}
 		}
