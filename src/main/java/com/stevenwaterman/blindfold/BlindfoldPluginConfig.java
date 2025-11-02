@@ -27,11 +27,23 @@ package com.stevenwaterman.blindfold;
 import net.runelite.client.config.Config;
 import net.runelite.client.config.ConfigGroup;
 import net.runelite.client.config.ConfigItem;
+import net.runelite.client.config.Keybind;
 
 @ConfigGroup(BlindfoldPluginConfig.GROUP)
 public interface BlindfoldPluginConfig extends Config
 {
 	String GROUP = "blindfold";
+
+	@ConfigItem(
+		keyName = "hotkey",
+		name = "Toggle hotkey",
+		description = "Toggle plugin functionality",
+		position = 1
+	)
+	default Keybind hotKey()
+	{
+		return Keybind.NOT_SET;
+	}
 
 	@ConfigItem(
 			keyName = "enableUI",

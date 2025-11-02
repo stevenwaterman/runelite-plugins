@@ -25,7 +25,6 @@
 package com.stevenwaterman.blindfold;
 
 import com.google.inject.Provides;
-import java.util.HashSet;
 import java.util.Objects;
 import javax.inject.Inject;
 import lombok.extern.slf4j.Slf4j;
@@ -35,30 +34,26 @@ import net.runelite.api.DynamicObject;
 import net.runelite.api.GameObject;
 import net.runelite.api.GameState;
 import net.runelite.api.GraphicsObject;
-import net.runelite.api.IntProjection;
 import net.runelite.api.Model;
 import net.runelite.api.ModelData;
 import net.runelite.api.Projectile;
-import net.runelite.api.Projection;
 import net.runelite.api.Renderable;
 import net.runelite.api.RuneLiteObject;
 import net.runelite.api.Scene;
 import net.runelite.api.Tile;
 import net.runelite.api.TileItem;
 import net.runelite.api.TileObject;
-import net.runelite.api.events.FocusChanged;
-import net.runelite.api.hooks.DrawCallbacks;
 import net.runelite.client.callback.ClientThread;
 import net.runelite.client.callback.RenderCallback;
 import net.runelite.client.callback.RenderCallbackManager;
 import net.runelite.client.config.ConfigManager;
 import net.runelite.client.eventbus.Subscribe;
 import net.runelite.client.events.ConfigChanged;
-import net.runelite.client.events.NotificationFired;
-import net.runelite.client.events.PluginChanged;
+import net.runelite.client.input.KeyManager;
 import net.runelite.client.plugins.Plugin;
 import net.runelite.client.plugins.PluginDescriptor;
 import net.runelite.client.ui.overlay.OverlayManager;
+import net.runelite.client.util.HotkeyListener;
 
 @PluginDescriptor(
 	name = "Blindfold",
@@ -85,6 +80,21 @@ public class BlindfoldPlugin extends Plugin
 
 	@Inject
 	private RenderCallbackManager renderCallbackManager;
+
+	private boolean enabled;
+
+	@Inject
+    private KeyManager keyManager;
+    private final HotkeyListener hotkeyListener = new HotkeyListener(() -> config.hotKey()) {
+        public void hotkeyPressed() {
+			if (enabled){
+				turnOff();
+			}
+			else {
+				turnOn();
+			}
+		}
+    };
 
 	@Provides
 	BlindfoldPluginConfig provideConfig(ConfigManager configManager)
@@ -162,6 +172,13 @@ public class BlindfoldPlugin extends Plugin
 	@Override
 	protected void startUp()
 	{
+		turnOn();
+		keyManager.registerKeyListener(hotkeyListener);
+	}
+
+	private void turnOn()
+	{
+		enabled = true;
 		overlayManager.add(overlay);
 		clientThread.invokeLater(() ->
 			{
@@ -176,6 +193,13 @@ public class BlindfoldPlugin extends Plugin
 	@Override
 	protected void shutDown()
 	{
+		turnOff();
+		keyManager.unregisterKeyListener(hotkeyListener);
+	}
+
+	private void turnOff()
+	{
+		enabled = false;
 		overlayManager.remove(overlay);
 
 		clientThread.invoke(() ->
