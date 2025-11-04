@@ -206,6 +206,11 @@ public class BlindfoldPlugin extends Plugin
 			{
 				renderCallbackManager.unregister(rcb);
 //				renderCallbackManager.unregister(DISABLE_RENDERING);
+
+				if (!config.enableScenery() || !config.enableTerrain()){
+					if (client.getGameState() == GameState.LOGGED_IN)
+						client.setGameState(GameState.LOADING);
+				}
 			}
 		);
 	}
